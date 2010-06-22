@@ -1,0 +1,207 @@
+#!/bin/sh
+#
+# check_apc_ups, APC UPS Nagios monitor plugin
+# Nagios plugin file
+# 
+# Author: Márcio Pessoa <marcio.pessoa@sciemon.com>
+# Contributors: none
+# 
+# Description:
+#   This plugin check APC UPS equipment.
+# 
+# Example: check_apc_ups <IP_ADDR> <COMMUNITY> <RESOURCE> <WARNING> <CRITICAL>
+# 
+# Change log
+# 2016-11-26
+#         Fixed lint issues.
+#         Improved help.
+#
+# 2009-mm-dd
+#         Experimental version.
+#
+
+# Nagios levels
+OK=0
+WARNING=1
+CRITICAL=2
+UNKNOW=3
+
+# SNMP OIDs
+# Battery Capacity
+OID_BATT='.1.3.6.1.4.1.318.1.1.1.2.2.1.0'
+# UPS Load (Percent) * 10
+OID_LOAD='.1.3.6.1.4.1.318.1.1.1.4.3.3.0'
+# UPS Load (Amperes) * 10
+OID_CURR='.1.3.6.1.4.1.318.1.1.1.4.3.4.0'
+# Input Voltage * 10
+OID_iVOLT='.1.3.6.1.4.1.318.1.1.1.3.3.1.0'
+# Output Voltage * 10
+OID_oVOLT='.1.3.6.1.4.1.318.1.1.1.4.3.1.0'
+# Battery Bus Voltage * 10
+OID_bVOLT='.1.3.6.1.4.1.318.1.1.1.2.3.4.0'
+# Input Frequency * 10
+OID_iFREQ='.1.3.6.1.4.1.318.1.1.1.3.3.4.0'
+# Output Frequency * 10
+OID_oFREQ='.1.3.6.1.4.1.318.1.1.1.4.3.2.0'
+# Battery Temperature * 10
+OID_bTEMP='.1.3.6.1.4.1.318.1.1.1.2.3.2.0'
+# External Temperature
+OID_eTEMP='.1.3.6.1.4.1.318.1.1.10.2.3.2.1.4.1'
+
+# Input options
+IP_ADDR=$1
+COMMUNITY=$2
+RESOURCE=$3
+LEVEL_WARNING=$4
+LEVEL_CRITICAL=$5
+
+# Commands
+SNMPGET="$(which snmpget) -Ov -v1 -Cf"
+
+check_result() {
+  # 
+  RESULT=$("$SNMPGET" -c "$COMMUNITY" "$IP_ADDR" "$OID" | awk '{print $2}')
+  RESULT=$(echo "scale=1; $RESULT/$FACTOR" | bc -l)
+
+  # Set OK values
+  MESSAGE="Check OK"
+  RETURN=$OK
+
+  # Check if result is warning ou critical level
+  case "$CHECK_TYPE" in
+    gt)
+      check_reverse
+      ;;
+    lt)
+      check_direct
+      ;;
+  esac
+
+  # Return string and Nagios notification level
+  echo "$MESSAGE: $NAME = $RESULT $UNIT | $NAME=$RESULT$UNIT;$LEVEL_WARNING;$LEVEL_CRITICAL"
+  exit $RETURN
+}
+
+check_direct() {
+  echo "$RESULT"' >= '"$LEVEL_WARNING" | bc > /dev/null
+  if [ $? -eq 1 ]; then
+    MESSAGE="Check Warning"
+    RETURN=$WARNING
+  fi
+  echo "$RESULT >= $LEVEL_CRITICAL" | bc > /dev/null
+  if [ $? -eq 1 ]; then
+    MESSAGE="Check Critical"
+    RETURN=$CRITICAL
+  fi
+}
+
+check_reverse() {
+  echo "$RESULT < $LEVEL_WARNING" | bc > /dev/null
+  if [ $? -eq 1 ]; then
+    MESSAGE="Check Warning"
+    RETURN=$WARNING
+  fi
+  echo "$RESULT < $LEVEL_CRITICAL" | bc > /dev/null
+  if [ $? -eq 1 ]; then
+    MESSAGE="Check Critical"
+    RETURN=$CRITICAL
+  fi
+}
+
+case "$RESOURCE" in
+  BATT)
+    OID=$OID_BATT
+    NAME="Baterry charge"
+    UNIT="%"
+    FACTOR=1
+    CHECK_TYPE=gt # Greater than
+    check_result
+    ;;
+  LOAD)
+    OID=$OID_LOAD
+    NAME="Load"
+    UNIT="%"
+    FACTOR=10
+    CHECK_TYPE=lt # Less than
+    check_result
+    ;;
+  CURR)
+    OID=$OID_CURR
+    NAME="Load"
+    UNIT="A"
+    FACTOR=10
+    CHECK_TYPE=lt # Less than
+    check_result
+    ;;
+  iVOLT)
+    OID=$OID_iVOLT
+    NAME="Input voltage"
+    UNIT="V"
+    FACTOR=10
+    CHECK_TYPE=gt # Less than
+    check_result
+    ;;
+  oVOLT)
+    OID=$OID_oVOLT
+    NAME="Output voltage"
+    UNIT="V"
+    FACTOR=10
+    CHECK_TYPE=gt # Less than
+    check_result
+    ;;
+  bVOLT)
+    OID=$OID_bVOLT
+    NAME="Battery Bus Voltage"
+    UNIT="V"
+    FACTOR=10
+    CHECK_TYPE=gt # Less than
+    check_result
+    ;;
+  iFREQ)
+    OID=$OID_iFREQ
+    NAME="Input Frequency"
+    UNIT="Hz"
+    FACTOR=10
+    CHECK_TYPE=gt # Less than
+    check_result
+    ;;
+  oFREQ)
+    OID=$OID_oFREQ
+    NAME="Output Frequency"
+    UNIT="Hz"
+    FACTOR=10
+    CHECK_TYPE=gt # Less than
+    check_result
+    ;;
+  bTEMP)
+    OID=$OID_bTEMP
+    NAME="Battery Temperature"
+    UNIT="C"
+    FACTOR=10
+    CHECK_TYPE=lt # Less than
+    check_result
+    ;;
+  eTEMP)
+    OID=$OID_eTEMP
+    NAME="External Temperature"
+    UNIT="C"
+    FACTOR=1
+    CHECK_TYPE=lt # Less than
+    check_result
+    ;;
+  *)
+    echo "Usage: $0 <IP_ADDR> <COMMUNITY> <RESOURCE> <WARNING> <CRITICAL>
+
+Available Resources:
+  BATT     Baterry charge (Percent)
+  LOAD     System load (Percent)
+  CURR     System load (Amperes)
+  iVOLT    Input voltage (Volts)
+  oVOLT    Output voltage (Volts)
+  bVOLT    Battery Bus Voltage (Volts)
+  iFREQ    Input Frequency (Hertz)
+  oFREQ    Output Frequency (Hertz)
+  bTEMP    Battery Temperature (Celsius)
+  eTEMP    External Temperature (Celsius)"
+esac
+exit $UNKNOW
