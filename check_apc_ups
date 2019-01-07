@@ -1,16 +1,16 @@
 #!/bin/sh
 #
-# check_apc_ups, APC UPS Nagios monitor plugin
+# check_apc_ups, APC UPS Nagios plugin
 # Nagios plugin file
-# 
+#
 # Author: Márcio Pessoa <marcio.pessoa@sciemon.com>
 # Contributors: none
-# 
+#
 # Description:
 #   This plugin check APC UPS equipment.
-# 
+#
 # Example: check_apc_ups <IP_ADDR> <COMMUNITY> <RESOURCE> <WARNING> <CRITICAL>
-# 
+#
 # Change log
 # 2016-11-26
 #         Fixed lint issues.
@@ -59,7 +59,7 @@ LEVEL_CRITICAL=$5
 SNMPGET="$(which snmpget) -Ov -v1 -Cf"
 
 check_result() {
-  # 
+  #
   RESULT=$("$SNMPGET" -c "$COMMUNITY" "$IP_ADDR" "$OID" | awk '{print $2}')
   RESULT=$(echo "scale=1; $RESULT/$FACTOR" | bc -l)
 
